@@ -59,10 +59,12 @@ auth-service/
 │   │   │       │   └── RoleRepository.java             # Acesso aos dados de papéis
 │   │   │       │
 │   │   │       ├── security/                           # Módulo de Configuração de Segurança e Criptografia
+│   │   │       │   ├── CustomAccessDeniedHandler.java      # Handler padronizado (ApiError 403) para falhas nos filtros
+│   │   │       │   ├── CustomAuthenticationEntryPoint.java # Handler padronizado (ApiError 401) para falhas nos filtros
 │   │   │       │   ├── JwtConfig.java                  # Declaração dos Beans de chaves RSA e Nimbus Encoders
 │   │   │       │   ├── JwtProperties.java              # Binding tipado das propriedades security.jwt
 │   │   │       │   ├── JwtService.java                 # Geração e montagem do Access Token assinado
-│   │   │       │   └── SecurityConfig.java             # Filtros de segurança HTTP, stateless e RBAC
+│   │   │       │   └── SecurityConfig.java             # Filtros de segurança HTTP, stateless, Actuator e RBAC
 │   │   │       │
 │   │   │       ├── token/                              # Módulo de Ciclo de Vida do Refresh Token
 │   │   │       │   ├── RefreshToken.java               # Entidade JPA mapeando a tabela 'refresh_tokens'
@@ -173,9 +175,12 @@ auth-service/
   - `SecurityConfig`: Habilita segurança web e de métodos (`@EnableWebSecurity`, `@EnableMethodSecurity`). Define a cadeia de filtros `SecurityFilterChain`:
     - Desabilita CSRF (aplicação estritamente stateless).
     - Configura política de criação de sessão como `SessionCreationPolicy.STATELESS`.
-    - Libera as rotas públicas de autenticação (`/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`).
+    - Libera as rotas públicas de autenticação (`/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`) e do Actuator (`/actuator/health`, `/actuator/health/**`, `/actuator/info`).
     - Exige autenticação para qualquer outra requisição.
+    - Registra `CustomAuthenticationEntryPoint` e `CustomAccessDeniedHandler` no Spring Security e no OAuth2 Resource Server.
     - Configura o OAuth2 Resource Server para validar tokens JWT utilizando o `JwtAuthenticationConverter`.
+  - `CustomAuthenticationEntryPoint`: Intercepta falhas de autenticação ocorridas nos filtros (ex: ausência de token, token expirado, assinatura adulterada) e retorna payload padronizado `ApiError` com HTTP 401 Unauthorized.
+  - `CustomAccessDeniedHandler`: Intercepta falhas de autorização ocorridas quando o usuário autenticado não possui o papel exigido e retorna payload padronizado `ApiError` com HTTP 403 Forbidden.
   - `JwtConfig`: Lê as chaves `private.pem` e `public.pem` do classpath, converte de formato PEM (Base64 PKCS#8 e X.509) para instâncias `RSAPrivateKey` e `RSAPublicKey`, e registra os beans `JwtEncoder` e `JwtDecoder` baseados na biblioteca Nimbus.
   - `JwtProperties`: Record anotado com `@ConfigurationProperties(prefix = "security.jwt")` para binding automático de propriedades: caminhos das chaves pública/privada, issuer (`entrego-auth`), tempo de expiração do access token (`15m`) e do refresh token (`30d`).
   - `JwtService`: Serviço especializado em construir e assinar o JWT (Access Token). Define as claims `iss`, `sub` (ID do usuário), `iat`, `exp` (+15 minutos) e o array customizado `roles` com os nomes das roles associadas ao usuário.

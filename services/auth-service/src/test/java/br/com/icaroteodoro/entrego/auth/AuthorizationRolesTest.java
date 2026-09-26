@@ -13,23 +13,38 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @DisplayName("5. Testes de Autorização e Roles (RBAC)")
 class AuthorizationRolesTest extends BaseIntegrationTest {
 
     @Test
-    @DisplayName("Endpoint autenticado sem JWT → 401")
+    @DisplayName("Endpoint autenticado sem JWT → 401 padronizado com ApiError via CustomAuthenticationEntryPoint")
     void shouldReturn401WhenAccessingAuthenticatedEndpointWithoutJwt() throws Exception {
         mockMvc.perform(get("/auth/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.path").value("/auth/me"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
 
         mockMvc.perform(get("/auth/customer-role-test"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.path").value("/auth/customer-role-test"));
 
         mockMvc.perform(get("/auth/admin-role-test"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.path").value("/auth/admin-role-test"));
+    }
+
+    @Test
+    @DisplayName("Actuator /actuator/health está acessível publicamente para Docker e Kubernetes probes")
+    void shouldAllowPublicAccessToActuatorHealth() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
     }
 
     @Test
@@ -56,14 +71,19 @@ class AuthorizationRolesTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("CUSTOMER não acessa endpoint hasRole('ADMIN') → 403")
+    @DisplayName("CUSTOMER não acessa endpoint hasRole('ADMIN') → 403 padronizado com ApiError via CustomAccessDeniedHandler")
     void shouldDenyCustomerFromAccessingAdminEndpointWith403() throws Exception {
         User customer = createTestUser("User Customer Blocked", "custblock@example.com", "senha123@", RoleName.CUSTOMER, UserStatus.ACTIVE);
         String token = jwtService.generateAccessToken(customer);
 
         mockMvc.perform(get("/auth/admin-role-test")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.error").value("Forbidden"))
+                .andExpect(jsonPath("$.message").value("Access denied: insufficient permissions to access this resource"))
+                .andExpect(jsonPath("$.path").value("/auth/admin-role-test"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test

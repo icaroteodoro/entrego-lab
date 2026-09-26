@@ -13,7 +13,12 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {
@@ -40,6 +45,7 @@ public class RefreshTokenService {
         );
 
         refreshTokenRepository.save(refreshToken);
+        log.debug("Created new refresh token record for user_id={}", user.getId());
 
         return rawToken;
     }
@@ -78,11 +84,14 @@ public class RefreshTokenService {
 
         RefreshToken refreshToken = refreshTokenRepository
                 .findByTokenHash(tokenHash)
-                .orElseThrow(() ->
-                        new InvalidRefreshTokenException("Invalid refresh token")
-                );
+                .orElseThrow(() -> {
+                    log.warn("Refresh token validation failed: hash not found in database");
+                    return new InvalidRefreshTokenException("Invalid refresh token");
+                });
 
         if (!refreshToken.isValid()) {
+            log.warn("Refresh token validation failed: token is expired or revoked (expired={}, revoked={})",
+                    refreshToken.isExpired(), refreshToken.isRevoked());
             throw new InvalidRefreshTokenException("Invalid or expired refresh token");
         }
 
@@ -95,17 +104,20 @@ public class RefreshTokenService {
 
         RefreshToken refreshToken = refreshTokenRepository
                 .findByTokenHash(tokenHash)
-                .orElseThrow(() ->
-                        new InvalidRefreshTokenException(
-                                "Invalid refresh token"
-                        )
-                );
+                .orElseThrow(() -> {
+                    log.warn("Refresh token revocation failed: token hash not found in database");
+                    return new InvalidRefreshTokenException(
+                            "Invalid refresh token"
+                    );
+                });
 
         if (refreshToken.isRevoked()) {
+            log.debug("Refresh token already revoked, idempotent operation");
             return;
         }
 
         refreshToken.revoke();
+        log.debug("Refresh token successfully revoked");
     }
 
 

@@ -81,6 +81,8 @@ br.com.icaroteodoro.entrego.auth/
 │   ├── RoleName.java                   # Enum de papéis: CUSTOMER, STORE_OWNER, ADMIN
 │   └── RoleRepository.java             # Repositório JPA para busca de papéis
 ├── security/                           # Infraestrutura de Segurança e Criptografia
+│   ├── CustomAccessDeniedHandler.java  # Handler padronizado (ApiError 403) para filtros
+│   ├── CustomAuthenticationEntryPoint.java # Handler padronizado (ApiError 401) para filtros
 │   ├── JwtConfig.java                  # Declaração dos Beans de chaves RSA e Nimbus
 │   ├── JwtProperties.java              # Record com propriedades tipadas security.jwt
 │   ├── JwtService.java                 # Geração e assinatura de JWT com chave privada
@@ -125,12 +127,17 @@ Senhas são transformadas em hashes via `BCryptPasswordEncoder`. O algoritmo emb
 - **Refresh Token Rotation (RTR)**: Ao chamar `/auth/refresh`, o token anterior é imediatamente invalidado (`revoked_at`), e um novo par (Access Token + Refresh Token) é emitido, neutralizando ataques de repetição.
 - **Checagem Ativa de Status**: A cada tentativa de autenticação ou renovação de token, o status da conta (`UserStatus.ACTIVE`) é validado no banco de dados.
 
+### 5. Política Segura de Logging e Auditoria
+- **Zero Vazamento de Credenciais**: Senhas brutas, hashes de senhas, access tokens (JWT) e refresh tokens nunca são impressos nos arquivos de log.
+- **Rastreabilidade**: Apenas identificadores operacionais não sensíveis (e-mails cadastrados, UUIDs de usuário e caminhos de requisição) são registrados via `@Slf4j`.
+
 ---
 
 ## 🧩 Catálogo de Componentes Spring
 
 ### Principais Beans Configurados
-- `SecurityFilterChain`: Define rotas públicas (`/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`), bloqueia acessos anônimos aos demais endpoints, define a sessão como `STATELESS` e registra o decoder JWT.
+- `SecurityFilterChain`: Define rotas públicas (`/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/actuator/health/**`, `/actuator/info`), bloqueia acessos anônimos aos demais endpoints, define a sessão como `STATELESS` e registra o decoder JWT.
+- `CustomAuthenticationEntryPoint` & `CustomAccessDeniedHandler`: Garantem que erros disparados na cadeia de filtros do Spring Security (401 Unauthorized e 403 Forbidden) sejam serializados no formato padrão `ApiError`.
 - `PasswordEncoder`: Fornece a instância do `BCryptPasswordEncoder`.
 - `JwtAuthenticationConverter`: Mapeia o claim `roles` do token para autoridades com prefixo `ROLE_`.
 - `RSAPublicKey` & `RSAPrivateKey`: Decodificam e disponibilizam em memória as chaves RSA carregadas do classpath.
@@ -168,12 +175,14 @@ flowchart LR
 | `/auth/me` | `GET` | Bearer JWT | N/A | `MeResponseDTO` (id, name, email, roles) |
 | `/auth/customer-role-test` | `GET` | Role `CUSTOMER` | N/A | `"Customer authorized"` |
 | `/auth/admin-role-test` | `GET` | Role `ADMIN` | N/A | `"Admin authorized"` |
+| `/actuator/health` | `GET` | Pública | N/A | `{"status":"UP"}` (com probes liveness/readiness) |
+| `/actuator/info` | `GET` | Pública | N/A | Informações da aplicação |
 
 ---
 
 ## 🚨 Tratamento de Exceções e Erros HTTP
 
-Todos os erros retornados pela API seguem a estrutura uniforme de [ApiError](docs/error-handling.md):
+Todos os erros retornados pela API (seja pelo `@RestControllerAdvice` ou pela cadeia de filtros do Spring Security) seguem a estrutura uniforme de [ApiError](docs/error-handling.md):
 
 ```json
 {
@@ -186,8 +195,8 @@ Todos os erros retornados pela API seguem a estrutura uniforme de [ApiError](doc
 ```
 
 - **400 Bad Request**: Parâmetros inválidos disparados por Bean Validation (`MethodArgumentNotValidException`).
-- **401 Unauthorized**: Credenciais incorretas no login (`BadCredentialsException`) ou refresh token inválido/expirado (`InvalidRefreshTokenException`).
-- **403 Forbidden**: Conta com status diferente de `ACTIVE` (`DisabledException`) ou tentativa de acessar rota sem a role necessária.
+- **401 Unauthorized**: Credenciais incorretas no login (`BadCredentialsException`), refresh token inválido/expirado (`InvalidRefreshTokenException`) ou token Bearer ausente/inválido nos filtros (`CustomAuthenticationEntryPoint`).
+- **403 Forbidden**: Conta com status diferente de `ACTIVE` (`DisabledException`) ou tentativa de acessar rota sem a role necessária nos filtros (`CustomAccessDeniedHandler`).
 
 Para detalhes completos, consulte [docs/error-handling.md](docs/error-handling.md).
 
@@ -224,6 +233,16 @@ security:
 
 server:
   port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      probes:
+        enabled: true
 ```
 
 ---

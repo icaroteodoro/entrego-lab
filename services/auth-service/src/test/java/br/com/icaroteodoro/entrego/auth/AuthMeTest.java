@@ -111,4 +111,20 @@ class AuthMeTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.tokenHash").doesNotExist())
                 .andExpect(jsonPath("$.tokens").doesNotExist());
     }
+
+    @Test
+    @DisplayName("Usuário desativado após emissão de token → /auth/me bloqueia com 403 Forbidden")
+    void shouldBlockMeWhenUserIsDeactivated() throws Exception {
+        User user = createTestUser("User Desativado", "desativado@example.com", "senha123@", RoleName.CUSTOMER, UserStatus.ACTIVE);
+        String token = jwtService.generateAccessToken(user);
+
+        user.setStatus(UserStatus.INACTIVE);
+        userRepository.save(user);
+
+        mockMvc.perform(get("/auth/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message").value("User account is not active"));
+    }
 }

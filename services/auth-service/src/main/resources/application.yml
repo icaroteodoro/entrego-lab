@@ -23,4 +23,15 @@ security:
     refresh-token-expiration: ${SECURITY_JWT_REFRESH_TOKEN_EXPIRATION:30d}
 
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true

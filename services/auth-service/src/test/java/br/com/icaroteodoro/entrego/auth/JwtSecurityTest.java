@@ -92,8 +92,8 @@ class JwtSecurityTest extends BaseIntegrationTest {
         String validToken = jwtService.generateAccessToken(user);
 
         String[] parts = validToken.split("\\.");
-        // Modifica o último caractere da assinatura
-        String corruptedSignature = parts[2].substring(0, parts[2].length() - 1) + (parts[2].endsWith("A") ? "B" : "A");
+        // Modifica bytes significativos da assinatura
+        String corruptedSignature = "invalid_signature_" + parts[2].substring(18);
         String corruptedToken = parts[0] + "." + parts[1] + "." + corruptedSignature;
 
         mockMvc.perform(get("/auth/me")

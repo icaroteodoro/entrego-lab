@@ -303,3 +303,58 @@ sequenceDiagram
     Svc-->>Auth: void
     Auth-->>Cliente: HTTP 204 No Content
 ```
+
+---
+
+## 8. Padronização de Falhas na Cadeia de Filtros do Spring Security
+
+Por padrão, falhas de segurança disparadas **dentro da cadeia de filtros** do Spring Security (como tentar acessar uma rota protegida sem token, enviar um token expirado, assinatura adulterada ou violar regras de `@PreAuthorize`) ocorrem antes de a requisição atingir a camada de controladores (`@RestController`). Consequentemente, esses erros **não são capturados pelo `@RestControllerAdvice`**.
+
+Para assegurar consistência arquitetural de 100% nas respostas de erro, o serviço registra componentes especializados:
+
+### 8.1. `CustomAuthenticationEntryPoint` (HTTP 401 Unauthorized)
+- **Quando atua**: Requisição em rota protegida sem cabeçalho `Authorization`, token Bearer malformado, token expirado ou assinatura RSA inválida.
+- **Implementação**: Escreve o payload padronizado `ApiError` diretamente no `HttpServletResponse` com status `401 Unauthorized`:
+```json
+{
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Full authentication is required to access this resource",
+  "path": "/auth/me",
+  "timestamp": "2026-09-26T18:00:00"
+}
+```
+
+### 8.2. `CustomAccessDeniedHandler` (HTTP 403 Forbidden)
+- **Quando atua**: O usuário está autenticado com sucesso via JWT, mas não possui a role necessária exigida pela rota ou anotação `@PreAuthorize` (ex: usuário `CUSTOMER` tentando acessar rota `@PreAuthorize("hasRole('ADMIN')")`).
+- **Implementação**: Escreve o payload padronizado `ApiError` diretamente com status `403 Forbidden`:
+```json
+{
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Access is denied",
+  "path": "/auth/admin-role-test",
+  "timestamp": "2026-09-26T18:00:05"
+}
+```
+
+Ambos os handlers são registrados tanto no `http.exceptionHandling()` quanto no `http.oauth2ResourceServer()` dentro do `SecurityConfig`.
+
+---
+
+## 9. Política Segura de Logs e Proteção de Dados Sensíveis
+
+O **Auth Service** adota uma política rigorosa de logs defensivos (`@Slf4j`) para prevenir vazamento inadvertido de dados sensíveis em arquivos de log, agregadores (Elasticsearch, Loki, CloudWatch) e consoles de monitoramento:
+
+### 🚫 O que NUNCA é registrado em log:
+1. **Senhas em texto puro**: A senha enviada pelo cliente jamais aparece em logs de requisição, debug ou exceções.
+2. **Hashes de senha (BCrypt)**: Hashes persistidos nunca são impressos em logs.
+3. **Access Tokens (JWT)**: O token JWT puro nunca é exposto em mensagens informativas ou de depuração.
+4. **Refresh Tokens opacos**: O valor do token gerado para o cliente nunca é logado.
+5. **Hashes SHA-256 de refresh tokens**: Hashes calculados em memória não são expostos.
+
+### ✅ O que é registrado de forma segura para auditoria:
+- **E-mails de usuários**: Apenas para rastreabilidade de eventos (ex: `"User successfully registered with email: maria.silva@example.com"` ou `"Successful login for user: maria.silva@example.com"`).
+- **IDs de usuários (UUID)**: Identificadores imutáveis para correlação em métricas (ex: `"Generated new refresh token for user ID: e2a3b174-8b89-..."`).
+- **Caminhos de requisição e códigos HTTP**: Para monitoramento de tráfego e taxa de falhas.
+

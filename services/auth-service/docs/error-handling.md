@@ -40,7 +40,9 @@ Abaixo estão todas as exceções tratadas nativamente pelo `GlobalExceptionHand
 | `MethodArgumentNotValidException` | `BAD_REQUEST` | **400** | `"<campo>: <mensagem_de_validacao>"` | Violação de anotações `@Valid` (`@NotBlank`, `@Email`, `@Size`). |
 | `BadCredentialsException` | `UNAUTHORIZED` | **401** | `"Invalid email or password"` | E-mail inexistente no banco ou senha informada incorreta no login. |
 | `InvalidRefreshTokenException` | `UNAUTHORIZED` | **401** | `"Invalid refresh token"` ou `"Invalid or expired refresh token"` | Refresh token inexistente, corrompido, expirado ou previamente revogado. |
-| `DisabledException` | `FORBIDDEN` | **403** | `"User account is not active"` | Tentativa de login ou renovação de token para usuário com status diferente de `ACTIVE`. |
+| `AuthenticationException` *(Filtro)* | `UNAUTHORIZED` | **401** | `"Full authentication is required to access this resource"` | Rota protegida acessada sem token JWT ou com token inválido/expirado (`CustomAuthenticationEntryPoint`). |
+| `DisabledException` | `FORBIDDEN` | **403** | `"User account is not active"` | Tentativa de login, refresh ou `/auth/me` para usuário com status diferente de `ACTIVE`. |
+| `AccessDeniedException` *(Filtro)* | `FORBIDDEN` | **403** | `"Access is denied"` | Usuário autenticado sem o perfil/role exigido pela rota (`CustomAccessDeniedHandler`). |
 
 ---
 
@@ -134,6 +136,42 @@ Abaixo estão todas as exceções tratadas nativamente pelo `GlobalExceptionHand
   "message": "User account is not active",
   "path": "/auth/login",
   "timestamp": "2026-09-26T17:24:12.789"
+}
+```
+
+---
+
+### 3.5. Falha de Autenticação na Cadeia de Filtros (HTTP 401 Unauthorized)
+- **Disparado por**: `AuthenticationException` capturada por `CustomAuthenticationEntryPoint`.
+- **Cenários**:
+  - Requisição sem cabeçalho `Authorization: Bearer <token>` em rota autenticada (ex: `GET /auth/me`).
+  - Cabeçalho presente, porém com formato incorreto.
+  - Access Token JWT expirado (`JwtValidationException`).
+  - Access Token com assinatura RSA adulterada ou gerada com chave privada incorreta (`BadJwtException`).
+
+```json
+{
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Full authentication is required to access this resource",
+  "path": "/auth/me",
+  "timestamp": "2026-09-26T18:00:00"
+}
+```
+
+---
+
+### 3.6. Falha de Autorização/Permissão na Cadeia de Filtros (HTTP 403 Forbidden)
+- **Disparado por**: `AccessDeniedException` capturada por `CustomAccessDeniedHandler`.
+- **Cenário**: O usuário enviou um token JWT válido e foi autenticado, porém não possui o papel (Role) exigido pelo endpoint (ex: usuário com perfil `CUSTOMER` tentando acessar rota `@PreAuthorize("hasRole('ADMIN')")`).
+
+```json
+{
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Access is denied",
+  "path": "/auth/admin-role-test",
+  "timestamp": "2026-09-26T18:00:05"
 }
 ```
 

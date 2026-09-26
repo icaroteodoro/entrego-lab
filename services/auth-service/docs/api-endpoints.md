@@ -22,6 +22,8 @@ Esta documentação provê a referência completa de todos os endpoints expostos
 | `GET` | `/auth/me` | Autenticado (`Bearer Token`) | Retorna os dados do perfil do usuário autenticado no token. |
 | `GET` | `/auth/customer-role-test` | Role `CUSTOMER` | Endpoint de teste para validação do papel `CUSTOMER`. |
 | `GET` | `/auth/admin-role-test` | Role `ADMIN` | Endpoint de teste para validação do papel `ADMIN`. |
+| `GET` | `/actuator/health` | Pública (`permitAll`) | Health check da aplicação e liveness/readiness probes para Docker/K8s. |
+| `GET` | `/actuator/info` | Pública (`permitAll`) | Informações gerais do microsserviço. |
 
 ---
 
@@ -287,6 +289,8 @@ Authorization: Bearer <seu_access_token_jwt>
 ```
 
 - **Status `401 Unauthorized`**: Token ausente, inválido, corrompido ou expirado.
+- **Status `403 Forbidden`**: Usuário encontrado no token possui status diferente de `ACTIVE` (ex: `INACTIVE`, `BLOCKED`, `PENDING_VERIFICATION`).
+- **Status `404 Not Found`**: Caso o UUID presente na claim `sub` do token não exista mais na base de dados.
 
 #### Exemplo cURL
 ```bash
@@ -345,3 +349,48 @@ Admin authorized
 curl -X GET http://localhost:8081/auth/admin-role-test \
   -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
+
+---
+
+### 2.8. `GET /actuator/health`
+Endpoint de monitoramento de saúde do microsserviço exposto via **Spring Boot Actuator**. Utilizado para health checks de containers Docker e sondas de vivacidade (*liveness*) e prontidão (*readiness*) em orquestradores como Kubernetes. Rota pública (`permitAll`).
+
+#### Headers
+```http
+Accept: application/json
+```
+
+#### Respostas
+
+- **Status `200 OK`**: A aplicação e suas dependências essenciais estão operacionais.
+```json
+{
+  "status": "UP"
+}
+```
+
+- **Sondas Específicas para Kubernetes**:
+  - `GET /actuator/health/liveness`: Verifica se o processo da JVM está vivo e funcional (`{"status":"UP"}`).
+  - `GET /actuator/health/readiness`: Verifica se o microsserviço está pronto para receber tráfego HTTP de rede (`{"status":"UP"}`).
+
+#### Exemplo cURL
+```bash
+curl -X GET http://localhost:8081/actuator/health
+```
+
+---
+
+### 2.9. `GET /actuator/info`
+Endpoint que provê metadados e informações da versão da aplicação. Rota pública (`permitAll`).
+
+#### Respostas
+- **Status `200 OK`**: Informações da aplicação.
+```json
+{}
+```
+
+#### Exemplo cURL
+```bash
+curl -X GET http://localhost:8081/actuator/info
+```
+

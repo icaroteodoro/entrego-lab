@@ -1,6 +1,7 @@
 package br.com.icaroteodoro.entrego.auth.exceptions;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -19,6 +21,7 @@ public class GlobalExceptionHandler {
             InvalidRefreshTokenException exception,
             HttpServletRequest request
     ) {
+        log.warn("Invalid refresh token at path={}: {}", request.getRequestURI(), exception.getMessage());
         return buildResponse(
                 HttpStatus.UNAUTHORIZED,
                 exception.getMessage(),
@@ -31,6 +34,7 @@ public class GlobalExceptionHandler {
             BadCredentialsException exception,
             HttpServletRequest request
     ) {
+        log.warn("Authentication failed on path={}: {}", request.getRequestURI(), exception.getMessage());
         return buildResponse(
                 HttpStatus.UNAUTHORIZED,
                 "Invalid email or password",
@@ -43,6 +47,7 @@ public class GlobalExceptionHandler {
             DisabledException exception,
             HttpServletRequest request
     ) {
+        log.warn("Access attempt by disabled user on path={}: {}", request.getRequestURI(), exception.getMessage());
         return buildResponse(
                 HttpStatus.FORBIDDEN,
                 exception.getMessage(),
@@ -81,6 +86,8 @@ public class GlobalExceptionHandler {
                         error.getField() + ": " + error.getDefaultMessage()
                 )
                 .orElse("Invalid request");
+
+        log.warn("Validation error on path={}: {}", request.getRequestURI(), message);
 
         return buildResponse(
                 HttpStatus.BAD_REQUEST,

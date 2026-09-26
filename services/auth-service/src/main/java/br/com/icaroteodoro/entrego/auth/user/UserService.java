@@ -6,10 +6,12 @@ import br.com.icaroteodoro.entrego.auth.role.RoleRepository;
 import br.com.icaroteodoro.entrego.auth.user.dtos.CreateUserRequestDTO;
 import br.com.icaroteodoro.entrego.auth.user.dtos.UserResponseDTO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -18,7 +20,10 @@ public class UserService {
     private final RoleRepository roleRepository;
 
     public ResponseEntity<UserResponseDTO> create(CreateUserRequestDTO request) throws IllegalAccessException {
+        log.info("Processing user registration for email={}", request.email());
+
         if(userRepository.existsUserByEmail(request.email())) {
+            log.warn("Registration rejected: email already registered={}", request.email());
             throw new IllegalAccessException("Email already registered");
         }
 
@@ -40,6 +45,8 @@ public class UserService {
         user.addRole(customerRole);
 
         User saved = userRepository.save(user);
+
+        log.info("User registered successfully with id={}", saved.getId());
 
         return ResponseEntity.ok(new UserResponseDTO(saved.getId(),saved.getName(), saved.getEmail()));
     }

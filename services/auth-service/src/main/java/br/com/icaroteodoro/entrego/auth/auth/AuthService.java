@@ -9,6 +9,7 @@ import br.com.icaroteodoro.entrego.auth.user.User;
 import br.com.icaroteodoro.entrego.auth.user.UserRepository;
 import br.com.icaroteodoro.entrego.auth.user.UserStatus;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -29,25 +31,27 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
 
     public LoginResponseDTO login(LoginRequestDTO request) {
+        log.info("Processing login attempt for email={}", request.email());
 
         User user = userRepository
                 .findByEmailIgnoreCase(request.email())
-                .orElseThrow(() ->
-                        new BadCredentialsException(
-                                "Invalid email or password"
-                        )
-                );
+                .orElseThrow(() -> {
+                    log.warn("Login failed: email not found");
+                    return new BadCredentialsException("Invalid email or password");
+                });
 
         if (!passwordEncoder.matches(
                 request.password(),
                 user.getPassword()
         )) {
+            log.warn("Login failed: password mismatch for user_id={}", user.getId());
             throw new BadCredentialsException(
                     "Invalid email or password"
             );
         }
 
         if (user.getStatus() != UserStatus.ACTIVE) {
+            log.warn("Login blocked: user_id={} status={}", user.getId(), user.getStatus());
             throw new DisabledException(
                     "User account is not active"
             );
@@ -55,6 +59,8 @@ public class AuthService {
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = refreshTokenService.create(user);
+
+        log.info("Login successful for user_id={}", user.getId());
 
         return new LoginResponseDTO(
                 accessToken,
@@ -72,6 +78,7 @@ public class AuthService {
         User user = currentRefreshToken.getUser();
 
         if (user.getStatus() != UserStatus.ACTIVE) {
+            log.warn("Token refresh rejected: user_id={} status={}", user.getId(), user.getStatus());
             throw new DisabledException("User account is not active");
         }
 
@@ -79,6 +86,8 @@ public class AuthService {
 
         String accessToken = jwtService.generateAccessToken(user);
         String newRefreshToken = refreshTokenService.create(user);
+
+        log.info("Token refresh successfully rotated for user_id={}", user.getId());
 
         return new LoginResponseDTO(
                 accessToken,
@@ -90,15 +99,23 @@ public class AuthService {
 
     @Transactional
     public void logout(LogoutRequestDTO request) {
+        log.info("Processing logout request");
         refreshTokenService.revoke(request.refreshToken());
+        log.info("Logout successfully processed");
     }
 
     @Transactional(readOnly = true)
     public MeResponseDTO me(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("User not found")
-                );
+                .orElseThrow(() -> {
+                    log.warn("Profile /auth/me lookup failed: user_id={} not found", userId);
+                    return new IllegalArgumentException("User not found");
+                });
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            log.warn("Profile /auth/me blocked: user_id={} is not active (status={})", user.getId(), user.getStatus());
+            throw new DisabledException("User account is not active");
+        }
 
         List<String> roles = user.getRoles()
                 .stream()

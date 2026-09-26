@@ -1,0 +1,100 @@
+# ==========================================
+# 📦 Entrego Lab - Root .gitignore
+# ==========================================
+
+# --- Segredos, Certificados e Chaves Criptográficas ---
+*.key
+*.pem
+*.pkcs8
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.secret
+*private*
+**/keys/private.pem
+
+# Exceção explícita para chaves públicas versionadas nos serviços
+!**/keys/public.pem
+
+# --- Variáveis de Ambiente e Credenciais ---
+.env
+.env.*
+!.env.example
+
+# --- Logs e Arquivos Temporários ---
+*.log
+logs/
+**/logs/
+*.tmp
+*.bak
+*.swp
+*.patch
+*.diff
+
+# --- Bancos de Dados e Volumes Locais ---
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+postgres_data/
+**/postgres_data/
+
+# Permite explicitamente scripts SQL de infraestrutura e migrações
+!**/init-scripts/*.sql
+!**/db/migration/*.sql
+
+# --- Build Artifacts (Maven & Gradle em qualquer serviço) ---
+target/
+**/target/
+build/
+**/build/
+out/
+**/out/
+*.jar
+*.war
+*.nar
+*.ear
+*.class
+.mvn/wrapper/maven-wrapper.jar
+HELP.md
+
+# --- IDEs e Editores ---
+# IntelliJ IDEA
+.idea/
+**/.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Visual Studio Code
+.vscode/
+**/.vscode/
+*.code-workspace
+
+# Eclipse / STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# --- Arquivos de Sistema Operacional ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini

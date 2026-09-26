@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: auth-service-test
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/entrego_auth_test
+    username: entrego
+    password: entrego
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+
+security:
+  jwt:
+    private-key: classpath:keys/private.pem
+    public-key: classpath:keys/public.pem
+    issuer: entrego-auth
+    access-token-expiration: 15m
+    refresh-token-expiration: 30d
+
+server:
+  port: 8081

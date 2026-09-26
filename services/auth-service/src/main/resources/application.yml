@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: auth-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/entrego_auth}
+    username: ${SPRING_DATASOURCE_USERNAME:entrego}
+    password: ${SPRING_DATASOURCE_PASSWORD:entrego}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+
+security:
+  jwt:
+    private-key: ${SECURITY_JWT_PRIVATE_KEY:classpath:keys/private.pem}
+    public-key: ${SECURITY_JWT_PUBLIC_KEY:classpath:keys/public.pem}
+    issuer: ${SECURITY_JWT_ISSUER:entrego-auth}
+    access-token-expiration: ${SECURITY_JWT_ACCESS_TOKEN_EXPIRATION:15m}
+    refresh-token-expiration: ${SECURITY_JWT_REFRESH_TOKEN_EXPIRATION:30d}
+
+server:
+  port: ${SERVER_PORT:8081}

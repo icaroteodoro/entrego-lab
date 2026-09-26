@@ -1,0 +1,20 @@
+services:
+
+  postgres:
+    image: postgres:17
+    container_name: entrego-postgres
+
+    environment:
+      POSTGRES_USER: entrego
+      POSTGRES_PASSWORD: entrego
+      POSTGRES_DB: entrego_auth
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+
+volumes:
+  postgres_data:
